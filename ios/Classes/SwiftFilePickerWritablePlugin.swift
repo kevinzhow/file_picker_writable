@@ -175,7 +175,7 @@ public class SwiftFilePickerWritablePlugin: NSObject, FlutterPlugin {
         }
         _filePickerResult = result
         _filePickerPath = nil
-        let ctrl = UIDocumentPickerViewController(documentTypes: [kUTTypeItem as String], in: UIDocumentPickerMode.open)
+        let ctrl = UIDocumentPickerViewController(documentTypes: [kUTTypeAudio as String, kUTTypeMovie as String], in: UIDocumentPickerMode.open)
         ctrl.delegate = self
         ctrl.modalPresentationStyle = .currentContext
         _viewController.present(ctrl, animated: true, completion: nil)
