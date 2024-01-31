@@ -14,18 +14,21 @@ import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import io.flutter.plugin.common.MethodChannel.MethodCallHandler
 import io.flutter.plugin.common.MethodChannel.Result
-import kotlinx.coroutines.*
 import java.io.File
 import java.io.PrintWriter
 import java.io.StringWriter
 import java.util.*
+import kotlinx.coroutines.*
 
 private const val TAG = "FilePickerWritable"
 
 /** FilePickerWritablePlugin */
-class FilePickerWritablePlugin : FlutterPlugin, MethodCallHandler,
-  ActivityAware,
-  ActivityProvider, CoroutineScope by MainScope() {
+class FilePickerWritablePlugin :
+    FlutterPlugin,
+    MethodCallHandler,
+    ActivityAware,
+    ActivityProvider,
+    CoroutineScope by MainScope() {
   /// The MethodChannel that will the communication between Flutter and native Android
   ///
   /// This local reference serves to register the plugin with the Flutter Engine and unregister it
@@ -38,42 +41,35 @@ class FilePickerWritablePlugin : FlutterPlugin, MethodCallHandler,
   private var eventSink: EventChannel.EventSink? = null
 
   override fun onAttachedToEngine(
-    @NonNull flutterPluginBinding: FlutterPlugin.FlutterPluginBinding
+      @NonNull flutterPluginBinding: FlutterPlugin.FlutterPluginBinding
   ) {
     initializePlugin(flutterPluginBinding.binaryMessenger)
   }
 
   private fun initializePlugin(binaryMessenger: BinaryMessenger) {
-    channel = MethodChannel(
-      binaryMessenger,
-      "design.codeux.file_picker_writable"
-    )
+    channel = MethodChannel(binaryMessenger, "design.codeux.file_picker_writable")
     channel.setMethodCallHandler(this)
-    EventChannel(
-      binaryMessenger,
-      "design.codeux.file_picker_writable/events"
-    ).setStreamHandler(object :
-      EventChannel.StreamHandler {
-      override fun onListen(arguments: Any?, events: EventChannel.EventSink?) {
-        eventSink = events
-        launch(Dispatchers.Main) {
-          while (true) {
-            val event = eventQueue.poll() ?: break
-            eventSink?.success(event)
-          }
-        }
-      }
+    EventChannel(binaryMessenger, "design.codeux.file_picker_writable/events")
+        .setStreamHandler(
+            object : EventChannel.StreamHandler {
+              override fun onListen(arguments: Any?, events: EventChannel.EventSink?) {
+                eventSink = events
+                launch(Dispatchers.Main) {
+                  while (true) {
+                    val event = eventQueue.poll() ?: break
+                    eventSink?.success(event)
+                  }
+                }
+              }
 
-      override fun onCancel(arguments: Any?) {
-        eventSink = null
-      }
-    })
+              override fun onCancel(arguments: Any?) {
+                eventSink = null
+              }
+            }
+        )
   }
 
-  override fun onMethodCall(
-    @NonNull call: MethodCall,
-    @NonNull result: Result
-  ) {
+  override fun onMethodCall(@NonNull call: MethodCall, @NonNull result: Result) {
     launch(Dispatchers.Main) {
       logDebug("Got method call: ${call.method}")
       try {
@@ -82,28 +78,36 @@ class FilePickerWritablePlugin : FlutterPlugin, MethodCallHandler,
             impl.init()
           }
           "openFilePicker" -> {
-            impl.openFilePicker(result)
+            val allowedExtensions =
+                call.argument<String>("allowedExtensions")
+                    ?: throw FilePickerException("Expected argument 'allowedExtensions'")
+            impl.openFilePicker(result, allowedExtensions)
           }
           "openFilePickerForCreate" -> {
-            val path = call.argument<String>("path")
-              ?: throw FilePickerException("Expected argument 'path'")
+            val path =
+                call.argument<String>("path")
+                    ?: throw FilePickerException("Expected argument 'path'")
             impl.openFilePickerForCreate(result, path)
           }
           "readFileWithIdentifier" -> {
-            val identifier = call.argument<String>("identifier")
-              ?: throw FilePickerException("Expected argument 'identifier'")
+            val identifier =
+                call.argument<String>("identifier")
+                    ?: throw FilePickerException("Expected argument 'identifier'")
             impl.readFileWithIdentifier(result, identifier)
           }
           "writeFileWithIdentifier" -> {
-            val identifier = call.argument<String>("identifier")
-              ?: throw FilePickerException("Expected argument 'identifier'")
-            val path = call.argument<String>("path")
-              ?: throw FilePickerException("Expected argument 'path'")
+            val identifier =
+                call.argument<String>("identifier")
+                    ?: throw FilePickerException("Expected argument 'identifier'")
+            val path =
+                call.argument<String>("path")
+                    ?: throw FilePickerException("Expected argument 'path'")
             impl.writeFileWithIdentifier(result, identifier, File(path))
           }
           "disposeIdentifier" -> {
-            val identifier = call.argument<String>("identifier")
-              ?: throw FilePickerException("Expected argument 'identifier'")
+            val identifier =
+                call.argument<String>("identifier")
+                    ?: throw FilePickerException("Expected argument 'identifier'")
             impl.disposeIdentifier(identifier)
             result.success(null)
           }
@@ -120,12 +124,9 @@ class FilePickerWritablePlugin : FlutterPlugin, MethodCallHandler,
         result.error("FilePickerError", e.toString(), null)
       }
     }
-
   }
 
-  override fun onDetachedFromEngine(
-    @NonNull binding: FlutterPlugin.FlutterPluginBinding
-  ) {
+  override fun onDetachedFromEngine(@NonNull binding: FlutterPlugin.FlutterPluginBinding) {
     channel.setMethodCallHandler(null)
     cancel("onDetachedFromEngine")
   }
@@ -155,19 +156,19 @@ class FilePickerWritablePlugin : FlutterPlugin, MethodCallHandler,
 
   override fun logDebug(message: String, e: Throwable?) {
     Log.d(TAG, message, e)
-    val exception = e?.let {
-      "${e.localizedMessage}\n" +
-        StringWriter().also {
-          e.printStackTrace(PrintWriter(it))
-        }.toString()
-    } ?: ""
+    val exception =
+        e?.let {
+          "${e.localizedMessage}\n" +
+              StringWriter().also { e.printStackTrace(PrintWriter(it)) }.toString()
+        }
+            ?: ""
     sendEvent(
-      mapOf(
-        "type" to "log",
-        "level" to "debug",
-        "message" to "${Thread.currentThread().name} $message",
-        "exception" to exception
-      )
+        mapOf(
+            "type" to "log",
+            "level" to "debug",
+            "message" to "${Thread.currentThread().name} $message",
+            "exception" to exception
+        )
     )
   }
 
@@ -182,8 +183,6 @@ class FilePickerWritablePlugin : FlutterPlugin, MethodCallHandler,
   }
 
   private fun sendEvent(event: Map<String, String>) {
-    launch(Dispatchers.Main) {
-      eventSink?.success(event) ?: eventQueue.add(event)
-    }
+    launch(Dispatchers.Main) { eventSink?.success(event) ?: eventQueue.add(event) }
   }
 }

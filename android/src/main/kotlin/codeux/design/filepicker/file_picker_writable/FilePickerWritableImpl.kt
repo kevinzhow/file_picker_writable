@@ -41,16 +41,24 @@ class FilePickerWritableImpl(private val plugin: ActivityProvider) :
   private var initOpenUrl: Uri? = null
 
   @MainThread
-  fun openFilePicker(result: MethodChannel.Result) {
+  fun openFilePicker(result: MethodChannel.Result, allowedExtensions: String) {
     if (filePickerResult != null) {
       throw FilePickerException("Invalid lifecycle, only one call at a time.")
     }
     filePickerResult = result
+
+    var mimeTypes = arrayOf("audio/*", "video/*")
+
+    if (allowedExtensions == "media") {
+      mimeTypes = arrayOf("audio/*", "video/*")
+    } else if (allowedExtensions == "subtitles") {
+      mimeTypes = arrayOf("*/*")
+    }
+
     val intent =
         Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
           addCategory(Intent.CATEGORY_OPENABLE)
           type = "*/*"
-          val mimeTypes = arrayOf("audio/*", "video/*")
           putExtra(Intent.EXTRA_MIME_TYPES, mimeTypes)
         }
 

@@ -61,7 +61,12 @@ public class SwiftFilePickerWritablePlugin: NSObject, FlutterPlugin {
                 }
                 result(true)
             case "openFilePicker":
-                openFilePicker(result: result)
+                guard
+                    let args = call.arguments as? Dictionary<String, Any>,
+                    let allowedExtensions = args["allowedExtensions"] as? String else {
+                        throw FilePickerError.invalidArguments(message: "Expected 'args'")
+                }
+                openFilePicker(allowedExtensions: allowedExtensions, result: result)
             case "openFilePickerForCreate":
                 guard
                     let args = call.arguments as? Dictionary<String, Any>,
@@ -168,14 +173,20 @@ public class SwiftFilePickerWritablePlugin: NSObject, FlutterPlugin {
         _viewController.present(ctrl, animated: true, completion: nil)
     }
 
-    func openFilePicker(result: @escaping FlutterResult) {
+    func openFilePicker(allowedExtensions: String, result: @escaping FlutterResult) {
         if (_filePickerResult != nil) {
             result(FlutterError(code: "DuplicatedCall", message: "Only one file open call at a time.", details: nil))
             return
         }
         _filePickerResult = result
         _filePickerPath = nil
-        let ctrl = UIDocumentPickerViewController(documentTypes: [kUTTypeAudio as String, kUTTypeMovie as String], in: UIDocumentPickerMode.open)
+        var documentTypes: [String] = []
+        if (allowedExtensions.contains("media")) {
+            documentTypes = [kUTTypeAudio as String, kUTTypeMovie as String]
+        } else if (allowedExtensions.contains("subtitles")) {
+            documentTypes.append(kUTTypeItem as String)
+        }
+        let ctrl = UIDocumentPickerViewController(documentTypes: documentTypes, in: UIDocumentPickerMode.open)
         ctrl.delegate = self
         ctrl.modalPresentationStyle = .currentContext
         _viewController.present(ctrl, animated: true, completion: nil)

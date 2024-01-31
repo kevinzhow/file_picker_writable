@@ -170,10 +170,11 @@ class FilePickerWritable {
 
   /// Shows a file picker so the user can select a file and calls [reader]
   /// afterwards.
-  Future<T?> openFile<T>(FileReader<T> reader) async {
+  Future<T?> openFile<T>(
+      {String allowedExtensions = '*', required FileReader<T> reader}) async {
     _logger.finest('openFilePicker()');
-    final result =
-        await _channel.invokeMapMethod<String, String>('openFilePicker');
+    final result = await _channel.invokeMapMethod<String, String>(
+        'openFilePicker', {'allowedExtensions': allowedExtensions});
     if (result == null) {
       // User cancelled.
       _logger.finer('User cancelled file picker.');
