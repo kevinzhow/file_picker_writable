@@ -1,4 +1,5 @@
 import Flutter
+import UniformTypeIdentifiers
 import UIKit
 import MobileCoreServices
 
@@ -180,15 +181,15 @@ public class SwiftFilePickerWritablePlugin: NSObject, FlutterPlugin {
         }
         _filePickerResult = result
         _filePickerPath = nil
-        var documentTypes: [String] = []
+        var documentTypes: [UTType] = []
         if (allowedExtensions.contains("media")) {
-            documentTypes = [kUTTypeAudio as String, kUTTypeMovie as String]
+            documentTypes = [UTType.audio, UTType.movie]
         } else if (allowedExtensions.contains("subtitles")) {
-            documentTypes.append(kUTTypeItem as String)
+            documentTypes.append(UTType.item)
         }
-        let ctrl = UIDocumentPickerViewController(documentTypes: documentTypes, in: UIDocumentPickerMode.open)
+        let ctrl = UIDocumentPickerViewController(forOpeningContentTypes: documentTypes, asCopy: false)
         ctrl.delegate = self
-        ctrl.modalPresentationStyle = .currentContext
+        ctrl.modalPresentationStyle = .overCurrentContext
         _viewController.present(ctrl, animated: true, completion: nil)
     }
 
@@ -264,7 +265,10 @@ public class SwiftFilePickerWritablePlugin: NSObject, FlutterPlugin {
 
 extension SwiftFilePickerWritablePlugin : UIDocumentPickerDelegate {
 
-    public func documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentAt url: URL) {
+    public func documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) {
+        guard let url = urls.first else {
+            return _sendFilePickerResult(nil)
+        }
         do {
             if let path = _filePickerPath {
                 _filePickerPath = nil
