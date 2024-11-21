@@ -246,13 +246,16 @@ class FileInfoDisplay extends StatelessWidget {
                   TextButton(
                     onPressed: () async {
                       try {
-                        await FilePickerWritable().readFile(
-                            identifier: fileInfo.identifier,
-                            reader: (fileInfo, file) async {
-                              await SimpleAlertDialog
-                                  .readFileContentsAndShowDialog(
-                                      fileInfo, file, context);
-                            });
+                        final fileResult = await FilePickerWritable().readFile(
+                          identifier: fileInfo.identifier,
+                        );
+
+                        await SimpleAlertDialog.readFileContentsAndShowDialog(
+                            fileInfo, File(fileResult.path), context);
+
+                        await FilePickerWritable().closeFile(
+                          identifier: fileInfo.identifier,
+                        );
                       } on Exception catch (e) {
                         if (!context.mounted) {
                           return;
