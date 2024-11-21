@@ -163,17 +163,15 @@ class MainScreenState extends State<MainScreen> {
   }
 
   Future<void> _openFilePicker() async {
-    final fileInfo =
-        await FilePickerWritable().openFile(reader: (fileInfo, file) async {
-      _logger.fine('Got picker result: $fileInfo');
-      final data = await _appDataBloc.store.load();
-      await _appDataBloc.store
-          .save(data.copyWith(files: data.files + [fileInfo]));
-      return fileInfo;
-    });
+    final fileInfo = await FilePickerWritable().openFile();
+
     if (fileInfo == null) {
       _logger.fine('User cancelled.');
+      return;
     }
+    final data = await _appDataBloc.store.load();
+    await _appDataBloc.store
+        .save(data.copyWith(files: data.files + [fileInfo]));
   }
 
   Future<void> _openFilePickerForCreate() async {
