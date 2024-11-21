@@ -164,7 +164,7 @@ class MainScreenState extends State<MainScreen> {
 
   Future<void> _openFilePicker() async {
     final fileInfo =
-        await FilePickerWritable().openFile((fileInfo, file) async {
+        await FilePickerWritable().openFile(reader: (fileInfo, file) async {
       _logger.fine('Got picker result: $fileInfo');
       final data = await _appDataBloc.store.load();
       await _appDataBloc.store

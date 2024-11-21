@@ -186,6 +186,8 @@ public class SwiftFilePickerWritablePlugin: NSObject, FlutterPlugin {
             documentTypes = [UTType.audio, UTType.movie]
         } else if (allowedExtensions.contains("subtitles")) {
             documentTypes.append(UTType.item)
+        } else {
+            documentTypes.append(UTType.item)
         }
         let ctrl = UIDocumentPickerViewController(forOpeningContentTypes: documentTypes, asCopy: false)
         ctrl.delegate = self
