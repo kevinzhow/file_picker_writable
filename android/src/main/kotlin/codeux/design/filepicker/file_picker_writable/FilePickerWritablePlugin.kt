@@ -24,11 +24,11 @@ private const val TAG = "FilePickerWritable"
 
 /** FilePickerWritablePlugin */
 class FilePickerWritablePlugin :
-    FlutterPlugin,
-    MethodCallHandler,
-    ActivityAware,
-    ActivityProvider,
-    CoroutineScope by MainScope() {
+        FlutterPlugin,
+        MethodCallHandler,
+        ActivityAware,
+        ActivityProvider,
+        CoroutineScope by MainScope() {
   /// The MethodChannel that will the communication between Flutter and native Android
   ///
   /// This local reference serves to register the plugin with the Flutter Engine and unregister it
@@ -41,7 +41,7 @@ class FilePickerWritablePlugin :
   private var eventSink: EventChannel.EventSink? = null
 
   override fun onAttachedToEngine(
-      @NonNull flutterPluginBinding: FlutterPlugin.FlutterPluginBinding
+          @NonNull flutterPluginBinding: FlutterPlugin.FlutterPluginBinding
   ) {
     initializePlugin(flutterPluginBinding.binaryMessenger)
   }
@@ -50,23 +50,23 @@ class FilePickerWritablePlugin :
     channel = MethodChannel(binaryMessenger, "design.codeux.file_picker_writable")
     channel.setMethodCallHandler(this)
     EventChannel(binaryMessenger, "design.codeux.file_picker_writable/events")
-        .setStreamHandler(
-            object : EventChannel.StreamHandler {
-              override fun onListen(arguments: Any?, events: EventChannel.EventSink?) {
-                eventSink = events
-                launch(Dispatchers.Main) {
-                  while (true) {
-                    val event = eventQueue.poll() ?: break
-                    eventSink?.success(event)
-                  }
-                }
-              }
+            .setStreamHandler(
+                    object : EventChannel.StreamHandler {
+                      override fun onListen(arguments: Any?, events: EventChannel.EventSink?) {
+                        eventSink = events
+                        launch(Dispatchers.Main) {
+                          while (true) {
+                            val event = eventQueue.poll() ?: break
+                            eventSink?.success(event)
+                          }
+                        }
+                      }
 
-              override fun onCancel(arguments: Any?) {
-                eventSink = null
-              }
-            }
-        )
+                      override fun onCancel(arguments: Any?) {
+                        eventSink = null
+                      }
+                    }
+            )
   }
 
   override fun onMethodCall(@NonNull call: MethodCall, @NonNull result: Result) {
@@ -79,35 +79,41 @@ class FilePickerWritablePlugin :
           }
           "openFilePicker" -> {
             val allowedExtensions =
-                call.argument<String>("allowedExtensions")
-                    ?: throw FilePickerException("Expected argument 'allowedExtensions'")
+                    call.argument<String>("allowedExtensions")
+                            ?: throw FilePickerException("Expected argument 'allowedExtensions'")
             impl.openFilePicker(result, allowedExtensions)
           }
           "openFilePickerForCreate" -> {
             val path =
-                call.argument<String>("path")
-                    ?: throw FilePickerException("Expected argument 'path'")
+                    call.argument<String>("path")
+                            ?: throw FilePickerException("Expected argument 'path'")
             impl.openFilePickerForCreate(result, path)
           }
           "readFileWithIdentifier" -> {
             val identifier =
-                call.argument<String>("identifier")
-                    ?: throw FilePickerException("Expected argument 'identifier'")
+                    call.argument<String>("identifier")
+                            ?: throw FilePickerException("Expected argument 'identifier'")
             impl.readFileWithIdentifier(result, identifier)
           }
           "writeFileWithIdentifier" -> {
             val identifier =
-                call.argument<String>("identifier")
-                    ?: throw FilePickerException("Expected argument 'identifier'")
+                    call.argument<String>("identifier")
+                            ?: throw FilePickerException("Expected argument 'identifier'")
             val path =
-                call.argument<String>("path")
-                    ?: throw FilePickerException("Expected argument 'path'")
+                    call.argument<String>("path")
+                            ?: throw FilePickerException("Expected argument 'path'")
             impl.writeFileWithIdentifier(result, identifier, File(path))
+          }
+          "closeFileWithIdentifier" -> {
+            val identifier =
+                    call.argument<String>("identifier")
+                            ?: throw FilePickerException("Expected argument 'identifier'")
+            impl.closeFileWithIdentifier(result, identifier)
           }
           "disposeIdentifier" -> {
             val identifier =
-                call.argument<String>("identifier")
-                    ?: throw FilePickerException("Expected argument 'identifier'")
+                    call.argument<String>("identifier")
+                            ?: throw FilePickerException("Expected argument 'identifier'")
             impl.disposeIdentifier(identifier)
             result.success(null)
           }
@@ -157,18 +163,18 @@ class FilePickerWritablePlugin :
   override fun logDebug(message: String, e: Throwable?) {
     Log.d(TAG, message, e)
     val exception =
-        e?.let {
-          "${e.localizedMessage}\n" +
-              StringWriter().also { e.printStackTrace(PrintWriter(it)) }.toString()
-        }
-            ?: ""
+            e?.let {
+              "${e.localizedMessage}\n" +
+                      StringWriter().also { e.printStackTrace(PrintWriter(it)) }.toString()
+            }
+                    ?: ""
     sendEvent(
-        mapOf(
-            "type" to "log",
-            "level" to "debug",
-            "message" to "${Thread.currentThread().name} $message",
-            "exception" to exception
-        )
+            mapOf(
+                    "type" to "log",
+                    "level" to "debug",
+                    "message" to "${Thread.currentThread().name} $message",
+                    "exception" to exception
+            )
     )
   }
 
