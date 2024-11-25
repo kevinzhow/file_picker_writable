@@ -189,7 +189,7 @@ class FilePickerWritable {
         unawaited(file.delete());
       }
 
-      unawaited(closeFile(identifier: identifier));
+      unawaited(closeFile(identifier: fileInfo.identifier));
     }
   }
 
@@ -242,7 +242,7 @@ class FilePickerWritable {
         unawaited(file.delete());
       }
 
-      unawaited(closeFile(identifier: identifier));
+      unawaited(closeFile(identifier: fileInfo.identifier));
     }
   }
 
