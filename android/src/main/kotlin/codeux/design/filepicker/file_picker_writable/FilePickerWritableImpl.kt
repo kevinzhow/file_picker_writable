@@ -213,8 +213,21 @@ class FilePickerWritableImpl(private val plugin: ActivityProvider) :
 
       val fileName = readFileInfo(fileUri, contentResolver)
 
+      val tempFile =
+              File.createTempFile(
+                      // use a maximum of 20 characters.
+                      // It's just a temp file name so does not really matter.
+                      fileName.take(20),
+                      null,
+                      activity.cacheDir
+              )
+      plugin.logDebug("Copy file $fileUri to $tempFile")
+      contentResolver.openInputStream(fileUri).use { input ->
+        requireNotNull(input)
+        tempFile.outputStream().use { output -> input.copyTo(output) }
+      }
       mapOf(
-              "path" to fileUri.path!!,
+              "path" to tempFile.absolutePath,
               "identifier" to fileUri.toString(),
               "persistable" to persistable.toString(),
               "fileName" to fileName,

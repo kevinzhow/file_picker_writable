@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
-import 'dart:typed_data';
 
 import 'package:convert/convert.dart';
 import 'package:file_picker_writable/file_picker_writable.dart';
@@ -256,14 +255,13 @@ class FileInfoDisplay extends StatelessWidget {
                           identifier: fileInfo.identifier,
                         );
 
-                        if (Platform.isAndroid) {
-                        } else {
-                          await SimpleAlertDialog.readFileContentsAndShowDialog(
-                              fileInfo, File(fileResult.path), context);
-                        }
+                        await SimpleAlertDialog.readFileContentsAndShowDialog(
+                            fileInfo, File(fileResult.path), context);
 
                         await FilePickerWritable().closeFile(
                           identifier: fileInfo.identifier,
+                          fullFilePath:
+                              Platform.isAndroid ? fileResult.path : null,
                         );
                       } on Exception catch (e) {
                         if (!context.mounted) {
@@ -352,23 +350,6 @@ class SimpleAlertDialog extends StatelessWidget {
   }) async {
     final dataList = await file.openRead(0, 64).toList();
     final data = dataList.expand((element) => element).toList();
-    final hexString = hex.encode(data);
-    final utf8String = utf8.decode(data, allowMalformed: true);
-    final fileContentExample = 'hexString: $hexString\n\nutf8: $utf8String';
-
-    // ignore: use_build_context_synchronously
-    await SimpleAlertDialog(
-      titleText: 'Read first ${data.length} bytes of file',
-      bodyText: '$bodyTextPrefix $fileContentExample',
-    ).show(context);
-  }
-
-  static Future<void> readContentsAndShowDialog(
-    Uint8List dataList,
-    BuildContext context, {
-    String bodyTextPrefix = '',
-  }) async {
-    final data = dataList.take(64).toList();
     final hexString = hex.encode(data);
     final utf8String = utf8.decode(data, allowMalformed: true);
     final fileContentExample = 'hexString: $hexString\n\nutf8: $utf8String';

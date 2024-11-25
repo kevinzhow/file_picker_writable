@@ -231,12 +231,18 @@ class FilePickerWritable {
   /// Closes the file previously picked by the user.
   /// Expects a [FileInfo.identifier] string for [identifier].
   ///
-  Future<void> closeFile({required String identifier}) async {
+  Future<void> closeFile(
+      {required String identifier, String? fullFilePath}) async {
     _logger.finest('closeFile()');
     final result = await _channel.invokeMapMethod<String, String>(
         'closeFileWithIdentifier', {'identifier': identifier});
     if (result == null) {
       throw StateError('Error while closing file with identifier $identifier');
+    }
+
+    if (fullFilePath != null) {
+      final file = File(fullFilePath!);
+      await file.delete();
     }
   }
 
