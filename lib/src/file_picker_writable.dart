@@ -185,7 +185,9 @@ class FilePickerWritable {
     try {
       return await reader(fileInfo, file);
     } finally {
-      unawaited(file.delete());
+      if (Platform.isAndroid) {
+        unawaited(file.delete());
+      }
     }
   }
 
@@ -234,7 +236,9 @@ class FilePickerWritable {
       _logger.warning('Error while calling reader method.', e, stackTrace);
       rethrow;
     } finally {
-      unawaited(file.delete());
+      if (Platform.isAndroid) {
+        unawaited(file.delete());
+      }
     }
   }
 
