@@ -213,7 +213,6 @@ class FileInfoDisplay extends StatelessWidget {
         child: Padding(
           padding: const EdgeInsets.all(16.0),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
               const Text('Selected File:'),
               Text(
@@ -224,7 +223,7 @@ class FileInfoDisplay extends StatelessWidget {
               ),
               Text(
                 fileInfo.identifier,
-                maxLines: 3,
+                maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               ),
               Text(
@@ -235,12 +234,6 @@ class FileInfoDisplay extends StatelessWidget {
               ),
               Text(
                 'fileName: ${fileInfo.fileName}',
-                style: theme.textTheme.bodyMedium
-                    ?.apply(fontSizeFactor: 0.7)
-                    .copyWith(fontWeight: FontWeight.bold),
-              ),
-              Text(
-                'path: ${fileInfo.path}',
                 style: theme.textTheme.bodyMedium
                     ?.apply(fontSizeFactor: 0.7)
                     .copyWith(fontWeight: FontWeight.bold),
@@ -260,8 +253,6 @@ class FileInfoDisplay extends StatelessWidget {
 
                         await FilePickerWritable().closeFile(
                           identifier: fileInfo.identifier,
-                          fullFilePath:
-                              Platform.isAndroid ? fileResult.path : null,
                         );
                       } on Exception catch (e) {
                         if (!context.mounted) {

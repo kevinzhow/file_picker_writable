@@ -27,7 +27,7 @@ interface ActivityProvider : CoroutineScope {
 }
 
 class FilePickerWritableImpl(private val plugin: ActivityProvider) :
-        PluginRegistry.ActivityResultListener, PluginRegistry.NewIntentListener {
+    PluginRegistry.ActivityResultListener, PluginRegistry.NewIntentListener {
 
   companion object {
     const val REQUEST_CODE_OPEN_FILE = 40832
@@ -56,11 +56,11 @@ class FilePickerWritableImpl(private val plugin: ActivityProvider) :
     }
 
     val intent =
-            Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
-              addCategory(Intent.CATEGORY_OPENABLE)
-              type = "*/*"
-              putExtra(Intent.EXTRA_MIME_TYPES, mimeTypes)
-            }
+        Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+          addCategory(Intent.CATEGORY_OPENABLE)
+          type = "*/*"
+          putExtra(Intent.EXTRA_MIME_TYPES, mimeTypes)
+        }
 
     val activity = requireActivity()
     try {
@@ -81,12 +81,12 @@ class FilePickerWritableImpl(private val plugin: ActivityProvider) :
     filePickerResult = result
     filePickerCreateFile = file
     val intent =
-            Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
-              addCategory(Intent.CATEGORY_OPENABLE)
-              //      type = "application/x-keepass"
-              type = "*/*"
-              putExtra(Intent.EXTRA_TITLE, file.name)
-            }
+        Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
+          addCategory(Intent.CATEGORY_OPENABLE)
+          //      type = "application/x-keepass"
+          type = "*/*"
+          putExtra(Intent.EXTRA_TITLE, file.name)
+        }
     val activity = requireActivity()
     try {
       activity.startActivityForResult(intent, REQUEST_CODE_CREATE_FILE)
@@ -104,12 +104,10 @@ class FilePickerWritableImpl(private val plugin: ActivityProvider) :
     }
 
     val result =
-            filePickerResult
-                    ?: return false.also {
-                      plugin.logDebug(
-                              "We have no active result, so activity result was not for us."
-                      )
-                    }
+        filePickerResult
+            ?: return false.also {
+              plugin.logDebug("We have no active result, so activity result was not for us.")
+            }
     filePickerResult = null
 
     plugin.logDebug("onActivityResult($requestCode, $resultCode, ${data?.data})")
@@ -137,10 +135,8 @@ class FilePickerWritableImpl(private val plugin: ActivityProvider) :
           }
           REQUEST_CODE_CREATE_FILE -> {
             val initialFileContent =
-                    filePickerCreateFile
-                            ?: throw FilePickerException(
-                                    "illegal state - filePickerCreateFile was null"
-                            )
+                filePickerCreateFile
+                    ?: throw FilePickerException("illegal state - filePickerCreateFile was null")
             val fileUri = requireNotNull(data?.data) { "RESULT_OK with null file uri $data" }
             plugin.logDebug("Got result $fileUri")
             handleFileUriCreateResponse(result, fileUri, initialFileContent)
@@ -160,14 +156,14 @@ class FilePickerWritableImpl(private val plugin: ActivityProvider) :
 
   @MainThread
   private suspend fun handleFileUriCreateResponse(
-          result: MethodChannel.Result,
-          fileUri: Uri,
-          initialFileContent: File
+      result: MethodChannel.Result,
+      fileUri: Uri,
+      initialFileContent: File
   ) {
     val activity = requireActivity()
     val contentResolver = activity.applicationContext.contentResolver
     val takeFlags: Int =
-            Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+        Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
     contentResolver.takePersistableUriPermission(fileUri, takeFlags)
 
     writeFileWithIdentifier(result, fileUri.toString(), initialFileContent)
@@ -181,11 +177,6 @@ class FilePickerWritableImpl(private val plugin: ActivityProvider) :
   @MainThread
   suspend fun readFileWithIdentifier(result: MethodChannel.Result, identifier: String) {
     copyContentUriAndReturn(result, Uri.parse(identifier))
-  }
-
-  @MainThread
-  suspend fun closeFileWithIdentifier(result: MethodChannel.Result, identifier: String) {
-    result.success(mapOf("uri" to Uri.parse(identifier).toString()))
   }
 
   @MainThread
@@ -204,7 +195,7 @@ class FilePickerWritableImpl(private val plugin: ActivityProvider) :
       var persistable = false
       try {
         val takeFlags: Int =
-                Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+            Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
         contentResolver.takePersistableUriPermission(fileUri, takeFlags)
         persistable = true
       } catch (e: SecurityException) {
@@ -214,51 +205,50 @@ class FilePickerWritableImpl(private val plugin: ActivityProvider) :
       val fileName = readFileInfo(fileUri, contentResolver)
 
       val tempFile =
-              File.createTempFile(
-                      // use a maximum of 20 characters.
-                      // It's just a temp file name so does not really matter.
-                      fileName.take(20),
-                      null,
-                      activity.cacheDir
-              )
+          File.createTempFile(
+              // use a maximum of 20 characters.
+              // It's just a temp file name so does not really matter.
+              fileName.take(20),
+              null,
+              activity.cacheDir
+          )
       plugin.logDebug("Copy file $fileUri to $tempFile")
       contentResolver.openInputStream(fileUri).use { input ->
         requireNotNull(input)
         tempFile.outputStream().use { output -> input.copyTo(output) }
       }
       mapOf(
-              "path" to tempFile.absolutePath,
-              "identifier" to fileUri.toString(),
-              "persistable" to persistable.toString(),
-              "fileName" to fileName,
-              "uri" to fileUri.toString()
+          "path" to tempFile.absolutePath,
+          "identifier" to fileUri.toString(),
+          "persistable" to persistable.toString(),
+          "fileName" to fileName,
+          "uri" to fileUri.toString()
       )
     }
   }
 
   private suspend fun readFileInfo(uri: Uri, contentResolver: ContentResolver): String =
-          withContext(Dispatchers.IO) {
-            // The query, because it only applies to a single document, returns only
-            // one row. There's no need to filter, sort, or select fields,
-            // because we want all fields for one document.
-            val cursor: Cursor? = contentResolver.query(uri, null, null, null, null, null)
+      withContext(Dispatchers.IO) {
+        // The query, because it only applies to a single document, returns only
+        // one row. There's no need to filter, sort, or select fields,
+        // because we want all fields for one document.
+        val cursor: Cursor? = contentResolver.query(uri, null, null, null, null, null)
 
-            cursor?.use {
-              if (!it.moveToFirst()) {
-                throw FilePickerException(
-                        "Cursor returned empty while trying to read file info for $uri"
-                )
-              }
-
-              // Note it's called "Display Name". This is
-              // provider-specific, and might not necessarily be the file name.
-              val displayName: String =
-                      it.getString(it.getColumnIndex(OpenableColumns.DISPLAY_NAME))
-              plugin.logDebug("Display Name: $displayName")
-              displayName
-            }
-                    ?: throw FilePickerException("Unable to load file info from $uri")
+        cursor?.use {
+          if (!it.moveToFirst()) {
+            throw FilePickerException(
+                "Cursor returned empty while trying to read file info for $uri"
+            )
           }
+
+          // Note it's called "Display Name". This is
+          // provider-specific, and might not necessarily be the file name.
+          val displayName: String = it.getString(it.getColumnIndex(OpenableColumns.DISPLAY_NAME))
+          plugin.logDebug("Display Name: $displayName")
+          displayName
+        }
+            ?: throw FilePickerException("Unable to load file info from $uri")
+      }
 
   fun onDetachedFromActivity(binding: ActivityPluginBinding) {
     binding.removeActivityResultListener(this)
@@ -272,9 +262,9 @@ class FilePickerWritableImpl(private val plugin: ActivityProvider) :
 
   @MainThread
   suspend fun writeFileWithIdentifier(
-          result: MethodChannel.Result,
-          identifier: String,
-          file: File
+      result: MethodChannel.Result,
+      identifier: String,
+      file: File
   ) {
     if (!file.exists()) {
       throw FilePickerException("File at source not found. $file")
@@ -299,7 +289,7 @@ class FilePickerWritableImpl(private val plugin: ActivityProvider) :
     val activity = requireActivity()
     val contentResolver = activity.applicationContext.contentResolver
     val takeFlags: Int =
-            Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+        Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
     contentResolver.releasePersistableUriPermission(Uri.parse(identifier), takeFlags)
   }
 
@@ -307,7 +297,7 @@ class FilePickerWritableImpl(private val plugin: ActivityProvider) :
     val activity = requireActivity()
     val contentResolver = activity.applicationContext.contentResolver
     val takeFlags: Int =
-            Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+        Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
     for (permission in contentResolver.persistedUriPermissions) {
       plugin.logDebug("Releasing identifier: $permission")
       contentResolver.releasePersistableUriPermission(permission.uri, takeFlags)
@@ -315,15 +305,15 @@ class FilePickerWritableImpl(private val plugin: ActivityProvider) :
   }
 
   private fun requireActivity() =
-          (plugin.activity
-                  ?: throw FilePickerException("Illegal state, expected activity to be there."))
+      (plugin.activity
+          ?: throw FilePickerException("Illegal state, expected activity to be there."))
 
   private val CONTENT_PROVIDER_SCHEMES =
-          setOf(
-                  ContentResolver.SCHEME_CONTENT,
-                  ContentResolver.SCHEME_FILE,
-                  ContentResolver.SCHEME_ANDROID_RESOURCE
-          )
+      setOf(
+          ContentResolver.SCHEME_CONTENT,
+          ContentResolver.SCHEME_FILE,
+          ContentResolver.SCHEME_ANDROID_RESOURCE
+      )
 
   override fun onNewIntent(intent: Intent): Boolean {
     val data = intent.data
