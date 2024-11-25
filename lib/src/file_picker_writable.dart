@@ -17,7 +17,6 @@ class FileInfo {
     required this.identifier,
     required this.persistable,
     required this.uri,
-    required this.path,
     this.fileName,
   });
 
@@ -26,7 +25,6 @@ class FileInfo {
         persistable: (json['persistable'] as String?) == 'true',
         uri: json['uri'] as String,
         fileName: json['fileName'] as String?,
-        path: json['path'] as String,
       );
 
   static FileInfo fromJsonString(String jsonString) =>
@@ -59,8 +57,6 @@ class FileInfo {
   /// Might be null.
   final String? fileName;
 
-  final String path;
-
   @override
   String toString() {
     return 'FileInfo{${toJson()}}';
@@ -71,7 +67,6 @@ class FileInfo {
         'persistable': persistable.toString(),
         'uri': uri,
         'fileName': fileName,
-        'path': path,
       };
 
   /// Serializes this data into a json string for easy serialization.
@@ -187,7 +182,11 @@ class FilePickerWritable {
     }
     final fileInfo = _resultToFileInfo(result);
     final file = _resultToFile(result);
-    return await reader(fileInfo, file);
+    try {
+      return await reader(fileInfo, file);
+    } finally {
+      unawaited(file.delete());
+    }
   }
 
   /// Opens a file picker for the user to create a file.
@@ -217,8 +216,9 @@ class FilePickerWritable {
   /// Reads the file previously picked by the user.
   /// Expects a [FileInfo.identifier] string for [identifier].
   ///
-  Future<FileInfo> readFile({
+  Future<T> readFile<T>({
     required String identifier,
+    required FileReader<T> reader,
   }) async {
     _logger.finest('readFile()');
     final result = await _channel.invokeMapMethod<String, String>(
@@ -227,20 +227,14 @@ class FilePickerWritable {
       throw StateError('Error while reading file with identifier $identifier');
     }
     final fileInfo = _resultToFileInfo(result);
-    return fileInfo;
-  }
-
-  /// Closes the file previously picked by the user.
-  /// Expects a [FileInfo.identifier] string for [identifier].
-  ///
-  Future<void> closeFile({
-    required String identifier,
-  }) async {
-    _logger.finest('closeFile()');
-    final result = await _channel.invokeMapMethod<String, String>(
-        'closeFileWithIdentifier', {'identifier': identifier});
-    if (result == null) {
-      throw StateError('Error while closing file with identifier $identifier');
+    final file = _resultToFile(result);
+    try {
+      return await reader(fileInfo, file);
+    } catch (e, stackTrace) {
+      _logger.warning('Error while calling reader method.', e, stackTrace);
+      rethrow;
+    } finally {
+      unawaited(file.delete());
     }
   }
 
@@ -313,7 +307,6 @@ class FilePickerWritable {
       persistable: result['persistable'] == 'true',
       uri: result['uri']!,
       fileName: result['fileName'],
-      path: result['path']!,
     );
   }
 
