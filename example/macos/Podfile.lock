@@ -2,32 +2,28 @@ PODS:
   - file_picker_writable (0.0.1):
     - FlutterMacOS
   - FlutterMacOS (1.0.0)
-  - path_provider (0.0.1)
-  - path_provider_macos (0.0.1):
+  - path_provider_foundation (0.0.1):
+    - Flutter
     - FlutterMacOS
 
 DEPENDENCIES:
   - file_picker_writable (from `Flutter/ephemeral/.symlinks/plugins/file_picker_writable/macos`)
-  - FlutterMacOS (from `Flutter/ephemeral/.symlinks/flutter/darwin-x64`)
-  - path_provider (from `Flutter/ephemeral/.symlinks/plugins/path_provider/macos`)
-  - path_provider_macos (from `Flutter/ephemeral/.symlinks/plugins/path_provider_macos/macos`)
+  - FlutterMacOS (from `Flutter/ephemeral`)
+  - path_provider_foundation (from `Flutter/ephemeral/.symlinks/plugins/path_provider_foundation/darwin`)
 
 EXTERNAL SOURCES:
   file_picker_writable:
     :path: Flutter/ephemeral/.symlinks/plugins/file_picker_writable/macos
   FlutterMacOS:
-    :path: Flutter/ephemeral/.symlinks/flutter/darwin-x64
-  path_provider:
-    :path: Flutter/ephemeral/.symlinks/plugins/path_provider/macos
-  path_provider_macos:
-    :path: Flutter/ephemeral/.symlinks/plugins/path_provider_macos/macos
+    :path: Flutter/ephemeral
+  path_provider_foundation:
+    :path: Flutter/ephemeral/.symlinks/plugins/path_provider_foundation/darwin
 
 SPEC CHECKSUMS:
   file_picker_writable: 91694d55c22f8430d4be119f0afb49755e65cd0c
-  FlutterMacOS: 15bea8a44d2fa024068daa0140371c020b4b6ff9
-  path_provider: e0848572d1d38b9a7dd099e79cf83f5b7e2cde9f
-  path_provider_macos: a0a3fd666cb7cd0448e936fb4abad4052961002b
+  FlutterMacOS: d0db08ddef1a9af05a5ec4b724367152bb0500b1
+  path_provider_foundation: 2b6b4c569c0fb62ec74538f866245ac84301af46
 
-PODFILE CHECKSUM: d8ba9b3e9e93c62c74a660b46c6fcb09f03991a7
+PODFILE CHECKSUM: 54d867c82ac51cbd61b565781b9fada492027009
 
-COCOAPODS: 1.8.4
+COCOAPODS: 1.16.2
