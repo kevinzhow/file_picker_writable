@@ -234,6 +234,8 @@ public class FilePickerWritablePlugin: NSObject, FlutterPlugin {
             var contentTypes: [UTType] = []
             if allowedExtensions.contains("media") {
                 contentTypes = [UTType.audio, UTType.movie]
+            } else if allowedExtensions.contains("subtitles") {
+                contentTypes = [UTType.item]
             } else if allowedExtensions != "*" {
                 // Parse comma-separated extensions
                 let extensions = allowedExtensions.split(separator: ",").map { String($0).trimmingCharacters(in: .whitespaces) }
@@ -242,13 +244,20 @@ public class FilePickerWritablePlugin: NSObject, FlutterPlugin {
                         contentTypes.append(utType)
                     }
                 }
+            } else {
+                // Allow any file when wildcard is provided
+                contentTypes = [UTType.item]
             }
-            if !contentTypes.isEmpty {
-                panel.allowedContentTypes = contentTypes
+            if contentTypes.isEmpty {
+                // Fallback to any file type if no content types were derived
+                contentTypes = [UTType.item]
             }
+            panel.allowedContentTypes = contentTypes
         } else {
             // Fallback for older macOS versions
-            if allowedExtensions != "*" && !allowedExtensions.contains("media") {
+            if allowedExtensions.contains("subtitles") || allowedExtensions == "*" {
+                panel.allowedFileTypes = nil
+            } else if allowedExtensions != "*" && !allowedExtensions.contains("media") {
                 let extensions = allowedExtensions.split(separator: ",").map { String($0).trimmingCharacters(in: .whitespaces) }
                 panel.allowedFileTypes = extensions
             }
@@ -350,4 +359,3 @@ extension FilePickerWritablePlugin: FlutterStreamHandler {
         }
     }
 }
-
