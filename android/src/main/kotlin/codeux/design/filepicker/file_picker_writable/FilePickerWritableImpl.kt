@@ -36,16 +36,18 @@ class FilePickerWritableImpl(private val plugin: ActivityProvider) :
 
   private var filePickerCreateFile: File? = null
   private var filePickerResult: MethodChannel.Result? = null
+  private var filePickerCopy: Boolean = true
 
   private var isInitialized = false
   private var initOpenUrl: Uri? = null
 
   @MainThread
-  fun openFilePicker(result: MethodChannel.Result, allowedExtensions: String) {
+  fun openFilePicker(result: MethodChannel.Result, allowedExtensions: String, copy: Boolean) {
     if (filePickerResult != null) {
       throw FilePickerException("Invalid lifecycle, only one call at a time.")
     }
     filePickerResult = result
+    filePickerCopy = copy
 
     var mimeTypes = arrayOf("audio/*", "video/*")
 
@@ -175,12 +177,16 @@ class FilePickerWritableImpl(private val plugin: ActivityProvider) :
 
   @MainThread
   private suspend fun handleFileUriResponse(result: MethodChannel.Result, fileUri: Uri) {
-    copyContentUriAndReturn(result, fileUri)
+    copyContentUriAndReturn(result, fileUri, filePickerCopy)
   }
 
   @MainThread
   suspend fun readFileWithIdentifier(result: MethodChannel.Result, identifier: String) {
-    copyContentUriAndReturn(result, Uri.parse(identifier))
+    // identifiers are always URIs that we have permission for, so we treat them as 'copy=true' 
+    // for now or we could assume if they are reading it they want a file. 
+    // But 'readFileWithIdentifier' implies getting the file info again.
+    // Preserving old behavior: force copy.
+    copyContentUriAndReturn(result, Uri.parse(identifier), true)
   }
 
   @MainThread
@@ -189,13 +195,20 @@ class FilePickerWritableImpl(private val plugin: ActivityProvider) :
   }
 
   @MainThread
-  private suspend fun copyContentUriAndReturn(result: MethodChannel.Result, fileUri: Uri) {
+  private suspend fun copyContentUriAndReturn(
+    result: MethodChannel.Result,
+    fileUri: Uri,
+    shouldCopy: Boolean
+  ) {
 
-    result.success(copyContentUriAndReturnFileInfo(fileUri))
+    result.success(copyContentUriAndReturnFileInfo(fileUri, shouldCopy))
   }
 
   @MainThread
-  private suspend fun copyContentUriAndReturnFileInfo(fileUri: Uri): Map<String, String> {
+  private suspend fun copyContentUriAndReturnFileInfo(
+    fileUri: Uri,
+    shouldCopy: Boolean
+  ): Map<String, String> {
     val activity = requireActivity()
 
     val contentResolver = activity.applicationContext.contentResolver
@@ -212,6 +225,16 @@ class FilePickerWritableImpl(private val plugin: ActivityProvider) :
       }
 
       val fileName = readFileInfo(fileUri, contentResolver)
+
+      if (!shouldCopy) {
+        return@withContext mapOf(
+          "path" to fileUri.toString(),
+          "identifier" to fileUri.toString(),
+          "persistable" to persistable.toString(),
+          "fileName" to fileName,
+          "uri" to fileUri.toString()
+        )
+      }
 
       val tempFile =
               File.createTempFile(
@@ -292,7 +315,7 @@ class FilePickerWritableImpl(private val plugin: ActivityProvider) :
         file.inputStream().use { input -> input.copyTo(output) }
       }
     }
-    copyContentUriAndReturn(result, fileUri)
+    copyContentUriAndReturn(result, fileUri, true)
   }
 
   fun disposeIdentifier(identifier: String) {
@@ -364,7 +387,9 @@ class FilePickerWritableImpl(private val plugin: ActivityProvider) :
     val scheme = uri.scheme ?: return
     val isFile = CONTENT_PROVIDER_SCHEMES.contains(scheme)
     if (isFile) {
-      plugin.openFile(copyContentUriAndReturnFileInfo(uri))
+      // Incoming intent (e.g. "Open With"). 
+      // Defaulting to copy=true as existing behavior implies providing a file path.
+      plugin.openFile(copyContentUriAndReturnFileInfo(uri, true))
     } else {
       plugin.handleOpenUri(uri)
     }

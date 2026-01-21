@@ -170,11 +170,19 @@ class FilePickerWritable {
 
   /// Shows a file picker so the user can select a file and calls [reader]
   /// afterwards.
+  ///
+  /// [copyFile] determines whether the file should be copied to a temporary
+  /// location (default) or if the original URI should be returned.
+  /// If [copyFile] is false, the [FileInfo.path] will be a URI string (e.g. content://...)
+  /// and standard [File] operations might not work.
   Future<T?> openFile<T>(
-      {String allowedExtensions = '*', required FileReader<T> reader}) async {
+      {String allowedExtensions = '*',
+      bool copyFile = true,
+      required FileReader<T> reader}) async {
     _logger.finest('openFilePicker()');
     final result = await _channel.invokeMapMethod<String, String>(
-        'openFilePicker', {'allowedExtensions': allowedExtensions});
+        'openFilePicker',
+        {'allowedExtensions': allowedExtensions, 'copy': copyFile});
     if (result == null) {
       // User cancelled.
       _logger.finer('User cancelled file picker.');
