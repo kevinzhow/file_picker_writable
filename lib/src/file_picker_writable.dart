@@ -171,18 +171,13 @@ class FilePickerWritable {
   /// Shows a file picker so the user can select a file and calls [reader]
   /// afterwards.
   ///
-  /// [copyFile] determines whether the file should be copied to a temporary
-  /// location (default) or if the original URI should be returned.
-  /// If [copyFile] is false, the [FileInfo.path] will be a URI string (e.g. content://...)
-  /// and standard [File] operations might not work.
+  /// [file] will point to a URI and standard
+  /// File operations will fail. Use [fileInfo.uri] instead.
   Future<T?> openFile<T>(
-      {String allowedExtensions = '*',
-      bool copyFile = true,
-      required FileReader<T> reader}) async {
+      {String allowedExtensions = '*', required FileReader<T> reader}) async {
     _logger.finest('openFilePicker()');
     final result = await _channel.invokeMapMethod<String, String>(
-        'openFilePicker',
-        {'allowedExtensions': allowedExtensions, 'copy': copyFile});
+        'openFilePicker', {'allowedExtensions': allowedExtensions});
     if (result == null) {
       // User cancelled.
       _logger.finer('User cancelled file picker.');
@@ -193,8 +188,12 @@ class FilePickerWritable {
     try {
       return await reader(fileInfo, file);
     } finally {
+      // With no-copy, file is just a pointer to URI, delete is not relevant or safe if it were a real file.
+      // But since it's constructed from URI string, file.delete() on it would separate from SAF.
+      // Ideally we don't call delete() on it.
       if (Platform.isAndroid) {
-        unawaited(file.delete());
+        // file.delete() on a URI path often fails or is meaningless.
+        // We'll suppressing it for now as part of cleanup.
       }
 
       unawaited(closeFile(identifier: fileInfo.identifier));
@@ -233,6 +232,7 @@ class FilePickerWritable {
     required FileReader<T> reader,
   }) async {
     _logger.finest('readFile()');
+    _logger.finest('readFile()');
     final result = await _channel.invokeMapMethod<String, String>(
         'readFileWithIdentifier', {'identifier': identifier});
     if (result == null) {
@@ -246,10 +246,7 @@ class FilePickerWritable {
       _logger.warning('Error while calling reader method.', e, stackTrace);
       rethrow;
     } finally {
-      if (Platform.isAndroid) {
-        unawaited(file.delete());
-      }
-
+      // Same as openFile, no temp file to delete.
       unawaited(closeFile(identifier: fileInfo.identifier));
     }
   }

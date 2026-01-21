@@ -81,8 +81,7 @@ class FilePickerWritablePlugin :
             val allowedExtensions =
                     call.argument<String>("allowedExtensions")
                             ?: throw FilePickerException("Expected argument 'allowedExtensions'")
-            val copy = call.argument<Boolean>("copy") ?: true
-            impl.openFilePicker(result, allowedExtensions, copy)
+            impl.openFilePicker(result, allowedExtensions)
           }
           "openFilePickerForCreate" -> {
             val path =
