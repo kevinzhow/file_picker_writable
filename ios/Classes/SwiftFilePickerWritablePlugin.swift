@@ -18,6 +18,7 @@ public class SwiftFilePickerWritablePlugin: NSObject, FlutterPlugin {
     private var _initOpen: (url: URL, persistable: Bool)?
     private var _eventSink: FlutterEventSink? = nil
     private var _eventQueue: [[String: String]] = []
+    private var _activeSecurityScopedUrls: [String: URL] = [:]
 
     public static func register(with registrar: FlutterPluginRegistrar) {
         guard let vc = UIApplication.shared.delegate?.window??.rootViewController else {
@@ -117,17 +118,18 @@ public class SwiftFilePickerWritablePlugin: NSObject, FlutterPlugin {
         var isStale: Bool = false
         let url = try URL(resolvingBookmarkData: bookmark, bookmarkDataIsStale: &isStale)
         logDebug("url: \(url) / isStale: \(isStale)");
-        let securityScope = url.startAccessingSecurityScopedResource()
-        if !securityScope {
-            logDebug("Warning: startAccessingSecurityScopedResource is false for \(url).")
-        }
-        
-        result(_fileInfoResult(tempFile: url, originalURL: url, bookmark: try url.bookmarkData()))
+        result(try _prepareUrlForReading(url: url, persistable: true))
     }
     
     func closeFile(identifier: String, result: @escaping FlutterResult) throws {
         guard let bookmark = Data(base64Encoded: identifier) else {
             result(FlutterError(code: "InvalidDataError", message: "Unable to decode bookmark.", details: nil))
+            return
+        }
+        if let activeUrl = _activeSecurityScopedUrls.removeValue(forKey: identifier) {
+            logDebug("Releasing active security scoped access for \(activeUrl)")
+            activeUrl.stopAccessingSecurityScopedResource()
+            result(_fileInfoResult(tempFile: activeUrl, originalURL: activeUrl, bookmark: bookmark))
             return
         }
         var isStale: Bool = false
@@ -246,18 +248,49 @@ public class SwiftFilePickerWritablePlugin: NSObject, FlutterPlugin {
     
     private func _prepareUrlForReading(url: URL, persistable: Bool) throws -> [String: String] {
         let securityScope = url.startAccessingSecurityScopedResource()
-        defer {
-            if securityScope {
-                url.stopAccessingSecurityScopedResource()
-            }
-        }
         if !securityScope {
             logDebug("Warning: startAccessingSecurityScopedResource is false for \(url)")
         }
-//        let tempFile = try _copyToTempDirectory(url: url)
-        // Get bookmark *after* ensuring file has been materialized to local device!
-        let bookmark = try url.bookmarkData()
-        return _fileInfoResult(tempFile: url, originalURL: url, bookmark: bookmark, persistable: persistable)
+        do {
+            try _warmUpReadableFile(url: url)
+            // Get bookmark only after coordinated access confirms the file is readable.
+            let bookmark = try url.bookmarkData()
+            let identifier = bookmark.base64EncodedString()
+            if securityScope {
+                _activeSecurityScopedUrls[identifier] = url
+            }
+            return _fileInfoResult(tempFile: url, originalURL: url, bookmark: bookmark, persistable: persistable)
+        } catch {
+            if securityScope {
+                url.stopAccessingSecurityScopedResource()
+            }
+            throw error
+        }
+    }
+
+    private func _warmUpReadableFile(url: URL) throws {
+        var coordinationError: NSError? = nil
+        var readError: Error? = nil
+
+        NSFileCoordinator().coordinate(readingItemAt: url, error: &coordinationError) { coordinatedUrl in
+            do {
+                let handle = try FileHandle(forReadingFrom: coordinatedUrl)
+                defer {
+                    handle.closeFile()
+                }
+                _ = try handle.read(upToCount: 1)
+            } catch let error {
+                readError = error
+            }
+        }
+
+        if let coordinationError = coordinationError {
+            throw coordinationError
+        }
+
+        if let readError = readError {
+            throw readError
+        }
     }
     
     private func _fileInfoResult(tempFile: URL, originalURL: URL, bookmark: Data, persistable: Bool = true) -> [String: String] {
