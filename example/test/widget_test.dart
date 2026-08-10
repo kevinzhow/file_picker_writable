@@ -6,21 +6,14 @@
 // tree, read text, and verify that the values of widget properties are correct.
 
 import 'package:file_picker_writable_example/main.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  testWidgets('Verify Platform version', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
+  testWidgets('shows the file picker actions', (WidgetTester tester) async {
     await tester.pumpWidget(const MyApp());
 
-    // Verify that platform version is retrieved.
-    expect(
-      find.byWidgetPredicate(
-        (Widget widget) =>
-            widget is Text && widget.data!.startsWith('Running on:'),
-      ),
-      findsOneWidget,
-    );
+    expect(find.text('File Picker Example'), findsOneWidget);
+    expect(find.text('Open File Picker'), findsOneWidget);
+    expect(find.text('Create New File'), findsOneWidget);
   });
 }

@@ -25,14 +25,8 @@ public class FilePickerWritablePlugin: NSObject, FlutterPlugin {
         eventChannel = FlutterEventChannel(name: "design.codeux.file_picker_writable/events", binaryMessenger: registrar.messenger)
         super.init()
         registrar.addMethodCallDelegate(self, channel: channel)
+        registrar.addApplicationDelegate(self)
         eventChannel.setStreamHandler(self)
-        NSAppleEventManager.shared().setEventHandler(self, andSelector: #selector(handleURLEvent(_:with:)), forEventClass: AEEventClass(kInternetEventClass), andEventID: AEEventID(kAEGetURL))
-        NSAppleEventManager.shared().setEventHandler(self, andSelector: #selector(handleOpenDocumentEvent(_:with:)), forEventClass: AEEventClass(kCoreEventClass), andEventID: AEEventID(kAEOpenDocuments))
-    }
-    
-    deinit {
-        NSAppleEventManager.shared().removeEventHandler(forEventClass: AEEventClass(kInternetEventClass), andEventID: AEEventID(kAEGetURL))
-        NSAppleEventManager.shared().removeEventHandler(forEventClass: AEEventClass(kCoreEventClass), andEventID: AEEventID(kAEOpenDocuments))
     }
     
     private func logDebug(_ message: String) {
@@ -45,30 +39,15 @@ public class FilePickerWritablePlugin: NSObject, FlutterPlugin {
         sendEvent(event: ["type": "log", "level": "ERROR", "message": message])
     }
     
-    @objc
-    private func handleURLEvent(_ event: NSAppleEventDescriptor, with replyEvent: NSAppleEventDescriptor) {
-        logDebug("Got URL event. \(event)")
-        guard let urlString = event.paramDescriptor(forKeyword: AEKeyword(keyDirectObject))?.stringValue else { return }
-        guard let url = URL(string: urlString) else { return }
-        logDebug("Handling URL: \(url)")
-        if url.isFileURL {
-            _ = _handle(url: url, persistable: true)
-        } else {
-            channel.invokeMethod("handleUri", arguments: url.absoluteString)
+    public func handleOpen(_ urls: [URL]) -> Bool {
+        var handled = false
+        for url in urls {
+            logDebug("Opening URL: \(url)")
+            if _handle(url: url, persistable: true) {
+                handled = true
+            }
         }
-    }
-    
-    @objc
-    private func handleOpenDocumentEvent(_ event: NSAppleEventDescriptor, with replyEvent: NSAppleEventDescriptor) {
-        logDebug("Got open document event. \(event)")
-        guard let listDescriptor = event.paramDescriptor(forKeyword: AEKeyword(keyDirectObject)) else { return }
-        for i in 1...listDescriptor.numberOfItems {
-            guard let urlDescriptor = listDescriptor.atIndex(i) else { continue }
-            guard let urlString = urlDescriptor.stringValue else { continue }
-            guard let url = URL(string: urlString) else { continue }
-            logDebug("Opening document: \(url)")
-            _ = _handle(url: url, persistable: true)
-        }
+        return handled
     }
     
     public func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {

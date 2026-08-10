@@ -12,3 +12,6 @@ PRODUCT_BUNDLE_IDENTIFIER = codeux.design.filepicker.filePickerWritableExample
 
 // The copyright displayed in application information
 PRODUCT_COPYRIGHT = Copyright © 2025 codeux.design.filepicker. All rights reserved.
+
+// The example is tested and distributed only on Apple silicon.
+EXCLUDED_ARCHS = x86_64

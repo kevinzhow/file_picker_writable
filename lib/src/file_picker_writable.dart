@@ -443,8 +443,8 @@ class FilePickerState {
 
   /// Registers the [fileOpenHandler] to be called when the app is launched
   /// with a file it should open.
-  /// The fileOpenHandler will receive a file object which will be deleted
-  /// once it returns.
+  /// The file object points at the user-selected resource and is not deleted
+  /// when the handler returns.
   void registerFileOpenHandler(FileOpenHandler fileOpenHandler) =>
       _registerFilePickerEventHandler(
           FilePickerEventHandlerLambda(fileOpenHandler: fileOpenHandler));

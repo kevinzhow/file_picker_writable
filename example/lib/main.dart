@@ -85,6 +85,10 @@ class MainScreenState extends State<MainScreen> {
       if (!mounted) {
         return false;
       }
+      final data = await _appDataBloc.store.load();
+      await _appDataBloc.store.save(
+        data.copyWith(files: data.files + [fileInfo]),
+      );
       await SimpleAlertDialog.readFileContentsAndShowDialog(
         fileInfo,
         file,
@@ -133,11 +137,13 @@ class MainScreenState extends State<MainScreen> {
                 Wrap(
                   children: <Widget>[
                     ElevatedButton(
+                      key: const ValueKey('open-file-picker'),
                       onPressed: _openFilePicker,
                       child: const Text('Open File Picker'),
                     ),
                     const SizedBox(width: 32),
                     ElevatedButton(
+                      key: const ValueKey('create-new-file'),
                       onPressed: _openFilePickerForCreate,
                       child: const Text('Create New File'),
                     ),
@@ -244,6 +250,7 @@ class FileInfoDisplay extends StatelessWidget {
                 alignment: MainAxisAlignment.end,
                 children: <Widget>[
                   TextButton(
+                    key: ValueKey('read-${fileInfo.fileName}'),
                     onPressed: () async {
                       try {
                         await FilePickerWritable().readFile(
@@ -263,6 +270,7 @@ class FileInfoDisplay extends StatelessWidget {
                     child: const Text('Read'),
                   ),
                   TextButton(
+                    key: ValueKey('overwrite-${fileInfo.fileName}'),
                     onPressed: () async {
                       await FilePickerWritable().writeFile(
                           identifier: fileInfo.identifier,
@@ -272,6 +280,7 @@ class FileInfoDisplay extends StatelessWidget {
                             await file.writeAsString(content);
                             // ignore: use_build_context_synchronously
                             await SimpleAlertDialog(
+                              titleText: 'Ready to overwrite',
                               bodyText: 'Written: $content',
                             ).show(context);
                           });

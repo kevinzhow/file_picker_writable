@@ -10,34 +10,33 @@ enum FilePickerError: Error {
 
 public class SwiftFilePickerWritablePlugin: NSObject, FlutterPlugin {
 
-    private let _viewController: UIViewController
+    private weak var _registrar: FlutterPluginRegistrar?
     private let _channel: FlutterMethodChannel
     private var _filePickerResult: FlutterResult?
     private var _filePickerPath: String?
     private var isInitialized = false
-    private var _initOpen: (url: URL, persistable: Bool)?
+    private var _pendingOpenRequests: [(url: URL, persistable: Bool)] = []
     private var _eventSink: FlutterEventSink? = nil
     private var _eventQueue: [[String: String]] = []
     private var _activeSecurityScopedUrls: [String: URL] = [:]
 
     public static func register(with registrar: FlutterPluginRegistrar) {
-        guard let vc = UIApplication.shared.delegate?.window??.rootViewController else {
-            NSLog("PANIC - unable to initialize plugin, no view controller available.")
-            fatalError("No viewController available.")
-        }
-        _ = SwiftFilePickerWritablePlugin(viewController: vc, registrar: registrar)
+        _ = SwiftFilePickerWritablePlugin(registrar: registrar)
     }
 
-    public init(viewController: UIViewController, registrar: FlutterPluginRegistrar) {
+    public init(registrar: FlutterPluginRegistrar) {
 
         let channel = FlutterMethodChannel(name: "design.codeux.file_picker_writable", binaryMessenger: registrar.messenger())
-        _viewController = viewController;
+        _registrar = registrar
         _channel = channel
 
         super.init()
 
         registrar.addMethodCallDelegate(self, channel: channel)
         registrar.addApplicationDelegate(self)
+        if #available(iOS 13.0, *) {
+            registrar.addSceneDelegate(self)
+        }
 
         let eventChannel = FlutterEventChannel(name: "design.codeux.file_picker_writable/events", binaryMessenger: registrar.messenger())
         eventChannel.setStreamHandler(self)
@@ -57,9 +56,10 @@ public class SwiftFilePickerWritablePlugin: NSObject, FlutterPlugin {
             switch call.method {
             case "init":
                 isInitialized = true
-                if let (openUrl, persistable) = _initOpen {
-                    _handleUrl(url: openUrl, persistable: persistable)
-                    _initOpen = nil
+                let pendingOpenRequests = _pendingOpenRequests
+                _pendingOpenRequests.removeAll()
+                for request in pendingOpenRequests {
+                    _handleUrl(url: request.url, persistable: request.persistable)
                 }
                 result(true)
             case "openFilePicker":
@@ -184,10 +184,20 @@ public class SwiftFilePickerWritablePlugin: NSObject, FlutterPlugin {
         }
         _filePickerResult = result
         _filePickerPath = path
-        let ctrl = UIDocumentPickerViewController(documentTypes: [kUTTypeFolder as String], in: UIDocumentPickerMode.open)
+        guard let viewController = _registrar?.viewController else {
+            _sendFilePickerResult(FlutterError(code: "ViewControllerUnavailable", message: "No Flutter view controller is available.", details: nil))
+            return
+        }
+        let sourceFile = URL(fileURLWithPath: path)
+        let ctrl: UIDocumentPickerViewController
+        if #available(iOS 14.0, *) {
+            ctrl = UIDocumentPickerViewController(forExporting: [sourceFile], asCopy: true)
+        } else {
+            ctrl = UIDocumentPickerViewController(url: sourceFile, in: .exportToService)
+        }
         ctrl.delegate = self
         ctrl.modalPresentationStyle = .currentContext
-        _viewController.present(ctrl, animated: true, completion: nil)
+        viewController.present(ctrl, animated: true, completion: nil)
     }
 
     func openFilePicker(allowedExtensions: String, result: @escaping FlutterResult) {
@@ -197,6 +207,10 @@ public class SwiftFilePickerWritablePlugin: NSObject, FlutterPlugin {
         }
         _filePickerResult = result
         _filePickerPath = nil
+        guard let viewController = _registrar?.viewController else {
+            _sendFilePickerResult(FlutterError(code: "ViewControllerUnavailable", message: "No Flutter view controller is available.", details: nil))
+            return
+        }
         var documentTypes: [UTType] = []
         if (allowedExtensions.contains("media")) {
             documentTypes = [UTType.audio, UTType.movie]
@@ -208,7 +222,7 @@ public class SwiftFilePickerWritablePlugin: NSObject, FlutterPlugin {
         let ctrl = UIDocumentPickerViewController(forOpeningContentTypes: documentTypes, asCopy: false)
         ctrl.delegate = self
         ctrl.modalPresentationStyle = .overCurrentContext
-        _viewController.present(ctrl, animated: true, completion: nil)
+        viewController.present(ctrl, animated: true, completion: nil)
     }
 
     private func _copyToTempDirectory(url: URL) throws -> URL {
@@ -309,6 +323,7 @@ public class SwiftFilePickerWritablePlugin: NSObject, FlutterPlugin {
             _result(result)
         }
         _filePickerResult = nil
+        _filePickerPath = nil
     }
 }
 
@@ -355,16 +370,24 @@ extension SwiftFilePickerWritablePlugin: FlutterApplicationLifeCycleDelegate {
     }
     
     public func application(_ application: UIApplication, continue userActivity: NSUserActivity, restorationHandler: @escaping ([Any]) -> Void) -> Bool {
-        // (handle universal links)
-        // Get URL components from the incoming user activity
+        return _handle(userActivity: userActivity)
+    }
+
+    private func _handle(userActivity: NSUserActivity) -> Bool {
         guard userActivity.activityType == NSUserActivityTypeBrowsingWeb,
             let incomingURL = userActivity.webpageURL else {
-                logDebug("Unsupported user activity. \(userActivity)")
-                return false
+            logDebug("Unsupported user activity. \(userActivity)")
+            return false
         }
         logDebug("continue userActivity webpageURL: \(incomingURL)")
         // TODO: Confirm that persistable should be true here
         return _handle(url: incomingURL, persistable: true)
+    }
+
+    @available(iOS 13.0, *)
+    private func _handle(urlContext: UIOpenURLContext) -> Bool {
+        logDebug("Opening URL \(urlContext.url) - options: \(urlContext.options)")
+        return _handle(url: urlContext.url, persistable: urlContext.options.openInPlace)
     }
     
     private func _handle(url: URL, persistable: Bool) -> Bool {
@@ -373,7 +396,7 @@ extension SwiftFilePickerWritablePlugin: FlutterApplicationLifeCycleDelegate {
 //            return false
 //        }
         if (!isInitialized) {
-            _initOpen = (url, persistable)
+            _pendingOpenRequests.append((url, persistable))
             return true
         }
         _handleUrl(url: url, persistable: persistable)
@@ -415,6 +438,46 @@ extension SwiftFilePickerWritablePlugin: FlutterApplicationLifeCycleDelegate {
         }
         let resolvedUrl = url.resolvingSymlinksInPath().absoluteString
         return inboxes.contains { resolvedUrl.starts(with: $0) }
+    }
+}
+
+@available(iOS 13.0, *)
+extension SwiftFilePickerWritablePlugin: FlutterSceneLifeCycleDelegate {
+    public func scene(
+        _ scene: UIScene,
+        willConnectTo session: UISceneSession,
+        options connectionOptions: UIScene.ConnectionOptions?
+    ) -> Bool {
+        guard let connectionOptions else {
+            return false
+        }
+
+        var handled = false
+        for urlContext in connectionOptions.urlContexts {
+            if _handle(urlContext: urlContext) {
+                handled = true
+            }
+        }
+        for userActivity in connectionOptions.userActivities {
+            if _handle(userActivity: userActivity) {
+                handled = true
+            }
+        }
+        return handled
+    }
+
+    public func scene(_ scene: UIScene, openURLContexts URLContexts: Set<UIOpenURLContext>) -> Bool {
+        var handled = false
+        for urlContext in URLContexts {
+            if _handle(urlContext: urlContext) {
+                handled = true
+            }
+        }
+        return handled
+    }
+
+    public func scene(_ scene: UIScene, continue userActivity: NSUserActivity) -> Bool {
+        return _handle(userActivity: userActivity)
     }
 }
 

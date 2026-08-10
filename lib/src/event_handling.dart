@@ -9,7 +9,8 @@ typedef FileInfoHandler = FutureOr<bool> Function(FileInfo fileInfo);
 
 /// FileOpenHandlers are registered as callbacks to be called when
 /// the app is launched for a file selection.
-/// [file] (and [fileInfo].file will be deleted after this function completes.)
+/// [file] points at the user-selected resource. The platform plugin owns its
+/// access lifetime; handlers must not delete it.
 ///
 /// The handler must return `true` if it has handled the file.
 typedef FileOpenHandler = FutureOr<bool> Function(FileInfo fileInfo, File file);
@@ -115,8 +116,6 @@ class FilePickerEventOpen extends FilePickerEvent {
   final FileInfo _fileInfo;
   final File _file;
 
-  bool noCleanupDeprecatedFileInfo = false;
-
   @override
   String get debugMessage => 'fileOpen';
 
@@ -128,16 +127,11 @@ class FilePickerEventOpen extends FilePickerEvent {
     // as a fallback invoke deprecated `handleFileInfo`.
     // ignore: deprecated_member_use_from_same_package
     if (await handler.handleFileInfo(_fileInfo)) {
-      noCleanupDeprecatedFileInfo = true;
       return true;
     }
     return false;
   }
 
   @override
-  Future<void> dispose() async {
-    if (!noCleanupDeprecatedFileInfo) {
-      await _file.delete();
-    }
-  }
+  Future<void> dispose() async {}
 }
