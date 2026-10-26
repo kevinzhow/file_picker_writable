@@ -14,6 +14,7 @@ import io.flutter.embedding.engine.plugins.activity.ActivityPluginBinding
 import io.flutter.plugin.common.MethodChannel
 import io.flutter.plugin.common.PluginRegistry
 import java.io.File
+import java.io.FileNotFoundException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -180,7 +181,21 @@ class FilePickerWritableImpl(private val plugin: ActivityProvider) :
 
   @MainThread
   suspend fun readFileWithIdentifier(result: MethodChannel.Result, identifier: String) {
-    copyContentUriAndReturn(result, Uri.parse(identifier))
+    val fileUri = Uri.parse(identifier)
+    ensureReadable(fileUri)
+    copyContentUriAndReturn(result, fileUri)
+  }
+
+  /**
+   * Opens and closes [fileUri] for reading. A document provider can keep
+   * answering metadata queries for a file that was deleted, so only opening
+   * it shows that the file is gone. Throws [FileNotFoundException] then,
+   * like iOS does when a bookmark no longer resolves.
+   */
+  private suspend fun ensureReadable(fileUri: Uri) = withContext(Dispatchers.IO) {
+    val contentResolver = requireActivity().applicationContext.contentResolver
+    contentResolver.openFileDescriptor(fileUri, "r")?.close()
+      ?: throw FileNotFoundException("No such file or directory: $fileUri")
   }
 
   @MainThread
