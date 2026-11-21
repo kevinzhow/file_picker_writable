@@ -48,13 +48,9 @@ class FilePickerWritableImpl(private val plugin: ActivityProvider) :
     }
     filePickerResult = result
 
-    var mimeTypes = arrayOf("audio/*", "video/*")
-
-    if (allowedExtensions == "media") {
-      mimeTypes = arrayOf("audio/*", "video/*")
-    } else if (allowedExtensions == "subtitles") {
-      mimeTypes = arrayOf("*/*")
-    }
+    // "media" limits the picker to audio and video; anything else ("*", the Dart default, "subtitles") allows every
+    // file, as on iOS (UTType.item).
+    val mimeTypes = if (allowedExtensions == "media") arrayOf("audio/*", "video/*") else arrayOf("*/*")
 
     val intent =
             Intent(Intent.ACTION_OPEN_DOCUMENT).apply {

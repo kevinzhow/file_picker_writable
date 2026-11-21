@@ -1,3 +1,4 @@
+import FileProvider
 import Flutter
 import UniformTypeIdentifiers
 import UIKit
@@ -6,6 +7,15 @@ import MobileCoreServices
 enum FilePickerError: Error {
     case readError(message: String)
     case invalidArguments(message: String)
+}
+
+/// A failure while making a resolved URL readable. Keeps whether
+/// security-scoped access could be started, so the caller can report it.
+/// Its description is the underlying error's, so existing messages keep their text.
+struct ReadPreparationError: Error, CustomStringConvertible {
+    let underlying: Error
+    let startedAccessing: Bool
+    var description: String { return "\(underlying)" }
 }
 
 public class SwiftFilePickerWritablePlugin: NSObject, FlutterPlugin {
@@ -116,9 +126,121 @@ public class SwiftFilePickerWritablePlugin: NSObject, FlutterPlugin {
             return
         }
         var isStale: Bool = false
-        let url = try URL(resolvingBookmarkData: bookmark, bookmarkDataIsStale: &isStale)
+        let url: URL
+        do {
+            url = try URL(resolvingBookmarkData: bookmark, bookmarkDataIsStale: &isStale)
+        } catch {
+            let readError = _readErrorInfo(error: error, stage: "resolveBookmark", url: nil, isStale: nil, startedAccessing: nil)
+            logError("readFile failed to resolve bookmark: \(readError.code) \(readError.details)")
+            result(FlutterError(code: readError.code, message: readError.message, details: readError.details))
+            return
+        }
         logDebug("url: \(url) / isStale: \(isStale)");
-        result(try _prepareUrlForReading(url: url, persistable: true))
+        if isStale {
+            // _prepareUrlForReading returns a fresh bookmark as the identifier;
+            // callers store it to replace the stale one.
+            logDebug("readFile: bookmark is stale for \(url.lastPathComponent); returning a refreshed identifier")
+        }
+        do {
+            result(try _prepareUrlForReading(url: url, persistable: true))
+        } catch {
+            let readError = _readErrorInfo(error: error, stage: "read", url: url, isStale: isStale, startedAccessing: nil)
+            logError("readFile failed: \(readError.code) \(readError.details)")
+            result(FlutterError(code: readError.code, message: readError.message, details: readError.details))
+        }
+    }
+
+    /// Maps a read failure to a FlutterError code that names the reason:
+    /// FileNotFound, PermissionDenied, BookmarkInvalid, FileNotDownloaded,
+    /// ProviderUnavailable or UnknownError. A bookmark that does not resolve
+    /// (e.g. NSFileReadCorruptFileError 259) is BookmarkInvalid unless the
+    /// error says the file is missing. The message is the error's text,
+    /// as before. `details` has the error domains and codes, the bookmark and
+    /// security-scope state and the file name (never the full path).
+    private func _readErrorInfo(error: Error, stage: String, url: URL?, isStale: Bool?, startedAccessing: Bool?) -> (code: String, message: String, details: [String: Any]) {
+        var underlyingError = error
+        var startedAccessing = startedAccessing
+        if let preparationError = error as? ReadPreparationError {
+            underlyingError = preparationError.underlying
+            startedAccessing = preparationError.startedAccessing
+        }
+        let nsError = underlyingError as NSError
+        let nestedError = nsError.userInfo[NSUnderlyingErrorKey] as? NSError
+
+        var downloadingStatus: URLUbiquitousItemDownloadingStatus? = nil
+        if let url = url {
+            downloadingStatus = (try? url.resourceValues(forKeys: [.ubiquitousItemDownloadingStatusKey]))?.ubiquitousItemDownloadingStatus
+        }
+
+        var code = SwiftFilePickerWritablePlugin._readErrorCode(nsError)
+            ?? nestedError.flatMap { SwiftFilePickerWritablePlugin._readErrorCode($0) }
+        if code == nil && stage == "resolveBookmark" {
+            code = "BookmarkInvalid"
+        }
+        if code == nil && downloadingStatus == .notDownloaded {
+            code = "FileNotDownloaded"
+        }
+        if code == nil && startedAccessing == false {
+            code = "PermissionDenied"
+        }
+
+        var details: [String: Any] = [
+            "stage": stage,
+            "domain": nsError.domain,
+            "code": nsError.code,
+        ]
+        if let nestedError = nestedError {
+            details["underlyingDomain"] = nestedError.domain
+            details["underlyingCode"] = nestedError.code
+        }
+        if let isStale = isStale {
+            details["isStale"] = isStale
+        }
+        if let startedAccessing = startedAccessing {
+            details["startAccessing"] = startedAccessing
+        }
+        if let url = url {
+            details["fileName"] = url.lastPathComponent
+        }
+        if let downloadingStatus = downloadingStatus {
+            details["downloadingStatus"] = downloadingStatus.rawValue
+        }
+        return (code: code ?? "UnknownError", message: "\(underlyingError)", details: details)
+    }
+
+    /// The reason code for one error, or nil when its domain and code say nothing specific.
+    private static func _readErrorCode(_ error: NSError) -> String? {
+        switch error.domain {
+        case NSCocoaErrorDomain:
+            switch error.code {
+            case NSFileNoSuchFileError, NSFileReadNoSuchFileError:
+                return "FileNotFound"
+            case NSFileReadNoPermissionError:
+                return "PermissionDenied"
+            case NSUbiquitousFileUnavailableError:
+                return "FileNotDownloaded"
+            default:
+                return nil
+            }
+        case NSPOSIXErrorDomain:
+            switch error.code {
+            case Int(ENOENT):
+                return "FileNotFound"
+            case Int(EACCES), Int(EPERM):
+                return "PermissionDenied"
+            default:
+                return nil
+            }
+        case NSFileProviderErrorDomain:
+            switch error.code {
+            case NSFileProviderError.Code.noSuchItem.rawValue:
+                return "FileNotFound"
+            default:
+                return "ProviderUnavailable"
+            }
+        default:
+            return nil
+        }
     }
     
     func closeFile(identifier: String, result: @escaping FlutterResult) throws {
@@ -278,7 +400,7 @@ public class SwiftFilePickerWritablePlugin: NSObject, FlutterPlugin {
             if securityScope {
                 url.stopAccessingSecurityScopedResource()
             }
-            throw error
+            throw ReadPreparationError(underlying: error, startedAccessing: securityScope)
         }
     }
 
@@ -336,7 +458,11 @@ extension SwiftFilePickerWritablePlugin : UIDocumentPickerDelegate {
         do {
             _sendFilePickerResult(try _prepareUrlForReading(url: url, persistable: true))
         } catch {
-            _sendFilePickerResult(FlutterError(code: "ErrorProcessingResult", message: "Error handling result url \(url): \(error)", details: nil))
+            let readError = _readErrorInfo(error: error, stage: "read", url: url, isStale: nil, startedAccessing: nil)
+            logError("Picked file is not readable: \(readError.code) \(readError.details)")
+            var details = readError.details
+            details["reason"] = readError.code
+            _sendFilePickerResult(FlutterError(code: "ErrorProcessingResult", message: "Error handling result url \(url): \(error)", details: details))
             return
         }
         
@@ -426,9 +552,13 @@ extension SwiftFilePickerWritablePlugin: FlutterApplicationLifeCycleDelegate {
             }
         } catch let error {
             logError("Error handling open url for \(url): \(error)")
-            _channel.invokeMethod("handleError", arguments: [
-                "message": "Error while handling openUrl for isFileURL=\(url.isFileURL): \(error)"
-            ])
+            let readError = _readErrorInfo(error: error, stage: "read", url: url, isStale: nil, startedAccessing: nil)
+            let arguments: [String: Any] = [
+                "message": "Error while handling openUrl for isFileURL=\(url.isFileURL): \(error)",
+                "code": readError.code,
+                "details": readError.details,
+            ]
+            _channel.invokeMethod("handleError", arguments: arguments)
         }
     }
 

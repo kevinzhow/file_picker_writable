@@ -26,15 +26,27 @@ abstract class FilePickerEventHandler {
 }
 
 class ErrorEvent {
-  ErrorEvent({required this.message});
-  factory ErrorEvent.fromJson(Map<dynamic, dynamic> map) =>
-      ErrorEvent(message: map['message'] as String? ?? 'Invalid error event');
+  ErrorEvent({required this.message, this.code, this.details});
+  factory ErrorEvent.fromJson(Map<dynamic, dynamic> map) => ErrorEvent(
+        message: map['message'] as String? ?? 'Invalid error event',
+        code: map['code'] as String?,
+        details: map['details'] as Map<dynamic, dynamic>?,
+      );
 
   final String message;
 
+  /// Why the file could not be read, when the platform reports it (iOS):
+  /// `FileNotFound`, `PermissionDenied`, `BookmarkInvalid`,
+  /// `FileNotDownloaded`, `ProviderUnavailable` or `UnknownError`.
+  final String? code;
+
+  /// Error domain/code, bookmark and security-scope state and file name, when
+  /// the platform reports them.
+  final Map<dynamic, dynamic>? details;
+
   @override
   String toString() {
-    return 'ErrorEvent{message: $message}';
+    return 'ErrorEvent{message: $message, code: $code, details: $details}';
   }
 }
 

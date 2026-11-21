@@ -227,6 +227,13 @@ class FilePickerWritable {
   /// Reads the file previously picked by the user.
   /// Expects a [FileInfo.identifier] string for [identifier].
   ///
+  /// On iOS a failure is a [PlatformException] whose `code` names the reason:
+  /// `FileNotFound`, `PermissionDenied`, `BookmarkInvalid`,
+  /// `FileNotDownloaded`, `ProviderUnavailable` or `UnknownError`. Its
+  /// `details` map holds `stage`, `domain`, `code`, `underlyingDomain`,
+  /// `underlyingCode`, `isStale`, `startAccessing`, `fileName` (last path
+  /// component only) and `downloadingStatus` where known.
+  ///
   Future<T> readFile<T>({
     required String identifier,
     required FileReader<T> reader,

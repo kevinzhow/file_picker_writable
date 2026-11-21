@@ -182,4 +182,66 @@ void main() {
       expect(readerCalled, isFalse);
     },
   );
+
+  test('readFile surfaces the native read error reason and details', () async {
+    messenger.setMockMethodCallHandler(const MethodChannel(_methodChannel), (
+      call,
+    ) async {
+      throw PlatformException(
+        code: 'FileNotFound',
+        message: 'The file clip.MOV could not be opened.',
+        details: <String, Object>{
+          'stage': 'read',
+          'domain': 'NSCocoaErrorDomain',
+          'code': 260,
+          'isStale': false,
+          'startAccessing': true,
+          'fileName': 'clip.MOV',
+        },
+      );
+    });
+
+    final error = await FilePickerWritable()
+        .readFile<void>(identifier: 'bookmark', reader: (info, file) async {})
+        .then<Object?>((_) => null, onError: (Object e) => e);
+
+    expect(error, isA<PlatformException>());
+    final exception = error! as PlatformException;
+    expect(exception.code, 'FileNotFound');
+    expect(exception.details, containsPair('code', 260));
+    expect(exception.details, containsPair('fileName', 'clip.MOV'));
+  });
+
+  test('handleError events carry the reason code and details', () async {
+    messenger.setMockMethodCallHandler(
+      const MethodChannel(_methodChannel),
+      (call) async => null,
+    );
+    final state = FilePickerWritable().init();
+    final errors = <ErrorEvent>[];
+    Future<bool> handler(ErrorEvent event) async {
+      errors.add(event);
+      return true;
+    }
+
+    state.registerErrorEventHandler(handler);
+    addTearDown(() => state.removeErrorEventHandler(handler));
+
+    final response = Completer<ByteData?>();
+    await messenger.handlePlatformMessage(
+      _methodChannel,
+      _codec.encodeMethodCall(
+        const MethodCall('handleError', <String, Object>{
+          'message': 'Error while handling openUrl',
+          'code': 'PermissionDenied',
+          'details': <String, Object>{'code': 257, 'startAccessing': false},
+        }),
+      ),
+      response.complete,
+    );
+    await response.future;
+
+    expect(errors.single.code, 'PermissionDenied');
+    expect(errors.single.details, containsPair('code', 257));
+  });
 }
